@@ -6,13 +6,12 @@ addpath(genpath(pwd));
 I = diag([2,4,3]);
 
 PseudoInertia = 1/2*trace(I)*eye(3)-I;
-assert( all(eig(PseudoInertia) > 0) ) % necessary for inertia to be value
-PseudoInertia = PseudoInertia/max(eig(PseudoInertia))*.15;
+assert( all(eig(PseudoInertia) > 0) ) % necessary for inertia to be valid. 
+PseudoInertia = PseudoInertia/max(eig(PseudoInertia))*.15; % Rescale it so the ellipse we draw isn't massive
 
-
-q = sym('q',[4 1],'real');
-w = sym('w',[3 1],'real'); % body coordinates
-u = sym('tau',[3 1]);
+q = sym('q',[4 1],'real'); % quaternion
+w = sym('w',[3 1],'real'); % given in body coordinates
+u = sym('tau',[3 1]); % given in body coordinates
 
 wdot = I\(u-skew(w)*I*w); % Euler equations
 
@@ -24,6 +23,8 @@ dt = 0.002; % Time step
 %% Dynamics
 nextq = q + quatRateRight(q,w)*dt; % This is a dirty integration routine.
 nextq = nextq/sqrt(nextq'*nextq);  % Should use quat product, but this has nicer expression
+                                   % that avoids divide by zero when omega=0
+                               
 nextw = w + wdot*dt;
 
 x_quat = [q ; w];
@@ -79,38 +80,46 @@ Q_w    = eye(3)/10;
 Q = double([Hess_phi zeros(3); zeros(3) Q_w]);
 R = eye(3)/3;
 
-%
+% Discrete time LQR solution. P is the solution of the ricatti equation, K
+% is the feedback matrix
 [P, K] = idare(A_phi,B_phi,Q,R);
 
 %% Simulation
 t = 0;
 tf = 10;
 
+% perturbation for initial condition of simulation
 e_quat = [1.1 .4 .1 .1]';
 e_quat = e_quat/norm(e_quat);
+
+% initial conditions for simulation
 q = quatProduct(q_des,e_quat);
 w = [0 2 3]';
 x = [q ; w];
-%%
+
+%% Pretty pictures
 figure(1);
 clf;
 g = axes();
+
+% Earth coordinate frame (grayish and skinny)
 CoordAxes(g,.05/5, .1/2/5,.3/5, { [1 1 1]*.6, [1 1 1]*.6, [1 1 1]*.6},1,1 )
 
 h_des = hgtransform(g);
 h_des.Matrix = [quatToRot(q_des) zeros(3,1) ; 0 0 0 1];
 
+% Desired coordinate frame (darker than regular one)
 CoordAxes(h_des,.05/2, .1/2,.3/2, { [1 0 0]*.5, [0 1 0]*.5, [0 0 1]*.5},1,1 )
-
-
 
 h_body = hgtransform(g);
 
+% Body fixed coordinate frame
 CoordAxes(h_body,.03, .055,.3/2, { [1 0 0], [0 1 0], [0 0 1]},1,.75 )
 
 draw_ellipse( h_body , [0 0 0]', PseudoInertia, [.3 .3 .3 ; 1 1 1], 1 );
 
-d = 2;
+% lighting 
+d = 2; % distance camera is away from origin
 strengthOut = .3;
 strengthUp  = .5;
 light('Position',[-d 0 d],'Style','infinite','Color',[1 1 1]*strengthOut);
@@ -118,28 +127,29 @@ light('Position',[d 0 d],'Style','infinite','Color',[1 1 1]*strengthOut);
 light('Position',[0 0 d],'Style','infinite','Color',[1 1 1]*strengthUp);
 light('Position',[0 0 -d],'Style','infinite','Color',[1 1 1]*strengthUp);
 
-
-
-
 xlim([-1.2 1.1]);
 ylim([-1.1 1.1]);
 zlim([-1.1 1.1]);
 view([47 30])
 
+%% Carry out the simulation
 while t < tf
     q = x(1:4);
     w = x(5:end);
     R = quatToRot(q);
     
+    % Update the graphics by setting the homogeneous tranform for the body
+    % frame
     h_body.Matrix = [R zeros(3,1); 0 0 0 1];
     
-    
+    % deviation from nominal state
     delta_quat = quatProduct( quatConj(q_bar) , q );
     delta_cayl  = quatToCayley(delta_quat);
-    
     delta_w = w-w_bar;
     
     delta_x_cayl = [ delta_cayl ; delta_w ];
+    
+    % Negative feedback from LQR
     u = u_bar - K * delta_x_cayl;
     
     x = fquat_fun(x, u);
