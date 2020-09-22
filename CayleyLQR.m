@@ -41,8 +41,8 @@ Bquat_fun = matlabFunction(Bq,'vars',{x_quat, u});
 
 % Desired and nominal are the same here
 q_des = [1 0 0 0]';
-q_des = rand(4,1);
-q_des = q_des/norm(q_des);
+%q_des = rand(4,1);
+%q_des = q_des/norm(q_des);
 q_bar = q_des;    % In this case
 w_bar = [0 0 0]';
 u_bar = [0 0 0]';

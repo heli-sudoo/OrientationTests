@@ -1,10 +1,11 @@
 function [angs1, angs2] = rotToEulerAngles(R,seq)
 
+% Gets the angle between two vectors
+% assumes ax is perpendicular to a0 and a1. ax sets the sign of the result
 getAng = @(a0, a1, ax) atan2( dot(ax, cross(a0,a1)) , dot(a0,a1) );
 
 I = eye(3);
 Re = @(i,th) expm(skew(I(:,i))*th);
-
 
 a0 = I(:,seq(1));
 a1 = a0;

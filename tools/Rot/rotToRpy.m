@@ -1,6 +1,6 @@
-function rpy = rotToRpy(R)
+function [rpy1 rpy2] = rotToRpy(R)
 
-rpy = rotToFixedAngles(R,[1 2 3]);
+[rpy1 rpy2] = rotToFixedAngles(R,[1 2 3]);
 
 end
 
